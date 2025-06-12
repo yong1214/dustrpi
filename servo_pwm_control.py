@@ -20,9 +20,9 @@ try:
     else:
         print(f"Error opening GPIO chip: {lgpio.error_text(chip_handle)}")
 
-    low = 500
-    mid = 1500
-    high = 2500
+    low = 500 # 0 degree
+    mid = 1500 # 135 degree for 20kg servo
+    high = 2500 # 270 degree for 20kg servo
     freq = 100
     offset = 0
     cycle = 1
