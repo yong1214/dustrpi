@@ -5,7 +5,7 @@ from gpiozero.pins.lgpio import LGPIOFactory
 from time import sleep
 
 # Specify GPIO pin and 
-servo_pin = 12  # Replace with the actual GPIO pin connected to the servo
+servo_pin = 18  # Replace with the actual GPIO pin connected to the servo
 try:
     # Open the GPIO chip (e.g., /dev/gpiochip4 on Raspberry Pi 5)
     chip_handle = lgpio.gpiochip_open(4)  # Get the gpiochip
