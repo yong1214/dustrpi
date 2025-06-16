@@ -5,15 +5,15 @@ from time import sleep
 
 # MQTT settings
 BROKER = "localhost"  # Use "broker.hivemq.com" for public broker or your public IP
-PORT = 1883
+PORT = 1886
 TOPIC = "pi/dcmotor/control"
 USERNAME = "madmax"  # Set if using authentication
 PASSWORD = "HomeGuard@123"  # Set if using authentication
 
 # --- Configuration (Adjust to your setup) ---
 MOTOR_ENA = 18    # Enable pin for motor driver
-MOTOR_IN1 = 13    # Input 1 for motor driver
-MOTOR_IN2 = 19    # Input 2 for motor driver
+MOTOR_IN1 = 23    # Input 1 for motor driver
+MOTOR_IN2 = 24    # Input 2 for motor driver
 ENCODER_A = 17    # Encoder A phase pin
 ENCODER_B = 27    # Encoder B phase pin
 
@@ -71,7 +71,7 @@ def set_speed(h, speed):
         speed = 1.0
     # Scale speed to a 0-100 range for PWM duty cycle
     duty_cycle = int(speed * 100)
-    lgpio.tx_pwm(h, MOTOR_ENA, PWM_FREQUENCY, duty_cycl
+    lgpio.tx_pwm(h, MOTOR_ENA, PWM_FREQUENCY, duty_cycle)
 
 # --- Encoder Handling ---
 
@@ -113,32 +113,43 @@ def on_connect(client, userdata, flags, rc):
         print(f"Connection failed with code {rc}")
 
 def on_message(client, userdata, msg):
+    global encoder_count
+    global h
     try:
-        command = msg.payload.decode().split(",")
-        switch = int(command[0])
+        command = msg.payload.decode('utf-8')
+        switch = int(command)
 
         if switch != 0 and switch != 1:
-            print("The command is only valid with payload (0,1)")
+            print(f"The command is only valid with payload (0,1), received {command}")
             return
+    except UnicodeDecodeError:
+        print("Decode error")
+        return
 
-        target_count = CNT_PER_REV * REV_NUM
-        encoder_count = 0
-        pid_output = 0
-        if switch == 1:
-            target_count = -target_count
-        while abs(encoder_count) <=  abs(target_count):
-            pid_output = pid.update(abs(target_count), abs(encoder_count))
-            print(f"PID output: {pid_output} Encoder: {encoder_count}")
-            if target_count < 0:
-                motor_forward(h)
-            else:
-                motor_backward(h)
-            # Limit output of PID Controller to valid PWM range
-            pid_output_scaled = abs(pid_output) * round(100.0/abs(target_count), 2)
-            pwm_output = max(PWM_MIN, min(PWM_MAX, pid_output_scaled))
-            set_speed(h, pwm_output/100.0)
-            print(f"PWM: {pwm_output:.2f}% Scaled PID output: {pid_output_scaled:.2f}")
-            time.sleep(0.1)
+    target_count = CNT_PER_REV * REV_NUM
+    encoder_count = 0
+    pid_output = 0
+    if switch == 1:
+        target_count = -target_count
+    while abs(encoder_count) <=  abs(target_count):
+        pid_output = pid.update(abs(target_count), abs(encoder_count))
+        print(f"PID output: {pid_output} Encoder: {encoder_count}")
+        if target_count < 0:
+            motor_forward(h)
+        else:
+            motor_backward(h)
+        # Limit output of PID Controller to valid PWM range
+        pid_output_scaled = abs(pid_output) * round(100.0/abs(target_count), 2)
+        pwm_output = max(PWM_MIN, min(PWM_MAX, pid_output_scaled))
+        set_speed(h, pwm_output/100.0)
+        print(f"PWM: {pwm_output:.2f}% Scaled PID output: {pid_output_scaled:.2f}")
+        sleep(0.1)
+    print(f"Switched to {switch}")
+    if h: 
+        print("Stopping Motor...")
+        motor_stop(h)
+        set_speed(h, 0)
+        sleep(0.1)
 
 # Set up MQTT client
 client = mqtt.Client()
@@ -170,7 +181,7 @@ try:
     # Setup Encoder Interrupt
     cb_ena = lgpio.callback(h, ENCODER_A, lgpio.BOTH_EDGES, encoder_callback)
     cb_enb = lgpio.callback(h, ENCODER_B, lgpio.BOTH_EDGES, encoder_callback)
-    time.sleep(0.1)
+    sleep(0.1)
 
     # Start loop
     client.loop_forever()
@@ -188,7 +199,7 @@ finally:
       print("Stopping Motor...")
       motor_stop(h)
       set_speed(h, 0)
-      time.sleep(0.1)
+      sleep(0.1)
       cb_ena.cancel()
       cb_enb.cancel()
       lgpio.gpiochip_close(h)
