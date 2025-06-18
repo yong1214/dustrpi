@@ -83,6 +83,8 @@ last_gpio = None
 # Set desired position
 target_count = 0 # Target position in encoder counts
 
+last_switch = 2 # Store the last switch ON/OFF
+
 def encoder_callback(chip, gpio, level, tick):
     global encoder_count
     global last_enc_a_level
@@ -112,9 +114,16 @@ def on_connect(client, userdata, flags, rc):
     else:
         print(f"Connection failed with code {rc}")
 
+first_msg = True
 def on_message(client, userdata, msg):
     global encoder_count
     global h
+    global last_switch
+    global first_msg
+    
+    if first_msg == True:
+        first_msg = False
+        return
     try:
         command = msg.payload.decode('utf-8')
         switch = int(command)
@@ -122,18 +131,30 @@ def on_message(client, userdata, msg):
         if switch != 0 and switch != 1:
             print(f"The command is only valid with payload (0,1), received {command}")
             return
+        #if switch == last_switch:
+        #    printf("Repeated switch, ignored!")
+        #    return
     except UnicodeDecodeError:
         print("Decode error")
         return
 
     target_count = CNT_PER_REV * REV_NUM
     encoder_count = 0
+    last_encoder_count = 0
     pid_output = 0
+    errors = 0
+    MAX_ERR = 10
     if switch == 1:
         target_count = -target_count
     while abs(encoder_count) <=  abs(target_count):
+        if encoder_count == 0 or last_encoder_count == encoder_count:
+            errors += 1
+            print(f"error: {errors}")
+        if errors >= MAX_ERR:
+            break
         pid_output = pid.update(abs(target_count), abs(encoder_count))
         print(f"PID output: {pid_output} Encoder: {encoder_count}")
+        last_encoder_count = encoder_count
         if target_count < 0:
             motor_forward(h)
         else:
@@ -144,6 +165,7 @@ def on_message(client, userdata, msg):
         set_speed(h, pwm_output/100.0)
         print(f"PWM: {pwm_output:.2f}% Scaled PID output: {pid_output_scaled:.2f}")
         sleep(0.1)
+    last_switch = switch
     print(f"Switched to {switch}")
     if h: 
         print("Stopping Motor...")
@@ -181,7 +203,7 @@ try:
     # Setup Encoder Interrupt
     cb_ena = lgpio.callback(h, ENCODER_A, lgpio.BOTH_EDGES, encoder_callback)
     cb_enb = lgpio.callback(h, ENCODER_B, lgpio.BOTH_EDGES, encoder_callback)
-    sleep(0.1)
+    sleep(10)
 
     # Start loop
     client.loop_forever()
