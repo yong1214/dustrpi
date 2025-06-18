@@ -18,11 +18,13 @@ ENCODER_A = 17    # Encoder A phase pin
 ENCODER_B = 27    # Encoder B phase pin
 
 PWM_MIN = 45
-PWM_MAX = 85
+PWM_MAX = 65
 PWM_FREQUENCY = 1000 # PWM frequency in Hz (Adjust as needed)
-CNT_PER_REV = 640 # Counts per revolution after scaling 4 CPR * 4 * 40:1 Gear Ratio
+# Counts per revolution after scaling >> PPR * 4 * Gear Ratio << for example, PPR = 4, gear ratio = 40:1, then CPR = 4 * 4 * 40 = 640
+# For 60 RPM HD Premium Planetary Gear Motor w Encoder, PPR = 12  and Gear Ratio = 139:1, so CPR = 12 * 4 * 139 = 6672 
+CNT_PER_REV = 6672
 CNT_PER_REV_OFFSET = 0
-REV_NUM = 6 # Number of rotations in a running cycle
+REV_NUM = 2 # Number of rotations in a running cycle
 
 # --- Initialize PID controller
 Kp = 1  # Proportional gain
@@ -143,7 +145,7 @@ def on_message(client, userdata, msg):
     last_encoder_count = 0
     pid_output = 0
     errors = 0
-    MAX_ERR = 10
+    MAX_ERR = 2
     if switch == 1:
         target_count = -target_count
     while abs(encoder_count) <=  abs(target_count):
